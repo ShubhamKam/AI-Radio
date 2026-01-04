@@ -2,12 +2,24 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+// Demo mode - works without backend
+const DEMO_MODE = true;
+const DEMO_USER = {
+  id: 'demo-user-001',
+  email: 'demo@airadio.app',
+  name: 'Demo User',
+  avatar: null,
+  createdAt: new Date().toISOString(),
+};
+const DEMO_TOKEN = 'demo-token-for-offline-mode';
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
+  timeout: 5000,
 });
 
 // Request interceptor
