@@ -5,7 +5,7 @@ const getApiUrl = () => {
   if (typeof window !== 'undefined' && localStorage.getItem('api_url')) {
     return localStorage.getItem('api_url')!;
   }
-  return import.meta.env.VITE_API_URL || 'https://de53006e188cfb.lhr.life/api';
+  return import.meta.env.VITE_API_URL || 'https://f8eb3ba28dfda4.lhr.life/api';
 };
 
 const API_URL = getApiUrl();
