@@ -22,21 +22,11 @@ export default function App() {
       <IonReactRouter>
         <IonTabs>
           <IonRouterOutlet>
-            <Route exact path="/home">
-              <Home />
-            </Route>
-            <Route exact path="/ingest">
-              <Ingest />
-            </Route>
-            <Route exact path="/library">
-              <Library />
-            </Route>
-            <Route exact path="/settings">
-              <Settings />
-            </Route>
-            <Route exact path="/">
-              <Redirect to="/home" />
-            </Route>
+            <Route exact path="/home" component={Home} />
+            <Route exact path="/ingest" component={Ingest} />
+            <Route exact path="/library" component={Library} />
+            <Route exact path="/settings" component={Settings} />
+            <Route exact path="/" render={() => <Redirect to="/home" />} />
           </IonRouterOutlet>
 
           <IonTabBar slot="bottom">
