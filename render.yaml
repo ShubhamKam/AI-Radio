@@ -1,14 +1,14 @@
-# Render Blueprint for AI Radio Backend
-# Deploy at: https://dashboard.render.com/
-
 services:
   - type: web
     name: ai-radio-api
     runtime: node
     region: oregon
     plan: free
-    buildCommand: cd backend && npm install && npx prisma generate && npx prisma db push && npx tsx src/seed.ts
-    startCommand: cd backend && npm run start
+    branch: cursor/ai-radio-app-development-8c3a
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npx prisma db push && npm run seed || true
+    startCommand: npm run start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
@@ -20,5 +20,3 @@ services:
         value: 7d
       - key: FRONTEND_URL
         value: "*"
-      - key: PORT
-        value: 10000
