@@ -1,7 +1,14 @@
 import axios from 'axios';
 
-// API URL - will be updated after Render deployment
-const API_URL = import.meta.env.VITE_API_URL || 'https://ai-radio-api.onrender.com/api';
+// API URL - check localStorage first, then env, then default
+const getApiUrl = () => {
+  if (typeof window !== 'undefined' && localStorage.getItem('api_url')) {
+    return localStorage.getItem('api_url')!;
+  }
+  return import.meta.env.VITE_API_URL || 'https://ai-radio-api.onrender.com/api';
+};
+
+const API_URL = getApiUrl();
 
 export const api = axios.create({
   baseURL: API_URL,
