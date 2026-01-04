@@ -1,0 +1,21 @@
+{
+  "appId": "com.airadio.app",
+  "appName": "AI Radio",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0f0f0f",
+      "showSpinner": true,
+      "spinnerColor": "#6366f1"
+    },
+    "StatusBar": {
+      "style": "dark",
+      "backgroundColor": "#0f0f0f"
+    }
+  }
+}

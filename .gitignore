@@ -1,0 +1,14 @@
+.env
+.env.local
+node_modules
+dist
+*.log
+logs
+uploads
+*.sqlite
+.DS_Store
+android
+ios
+*.apk
+*.aab
+backend/data
