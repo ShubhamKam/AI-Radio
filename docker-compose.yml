@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Development container
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: ai-radio-dev
+    volumes:
+      # Mount workspace for live code editing
+      - .:/workspace
+      # Node modules volume (if using Node.js)
+      - node_modules:/workspace/node_modules
+      # Python virtual environment volume (if using Python)
+      - python_env:/workspace/venv
+    ports:
+      # Frontend port (adjust based on your stack)
+      - "3000:3000"
+      # Backend API port (adjust based on your stack)
+      - "8000:8000"
+      # Audio streaming port (if needed)
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      # Add your environment variables here
+      # - API_KEY=your_api_key
+      # - DATABASE_URL=your_database_url
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+    networks:
+      - ai-radio-network
+
+  # Database service (uncomment and configure when needed)
+  # database:
+  #   image: postgres:15-alpine
+  #   container_name: ai-radio-db
+  #   environment:
+  #     POSTGRES_USER: airadio
+  #     POSTGRES_PASSWORD: airadio_dev
+  #     POSTGRES_DB: airadio_dev
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - ai-radio-network
+
+  # Redis service (uncomment when needed for caching)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: ai-radio-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - ai-radio-network
+
+volumes:
+  node_modules:
+  python_env:
+  # postgres_data:
+  # redis_data:
+
+networks:
+  ai-radio-network:
+    driver: bridge
