@@ -9,16 +9,30 @@ import {
   DocumentIcon,
   TrashIcon,
   CheckIcon,
+  CpuChipIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { userApi, spotifyAuthApi, googleApi } from '../services/api';
+import { userApi, spotifyAuthApi, googleApi, api } from '../services/api';
 import type { UserPreference, ShowFormat } from '../types';
 import toast from 'react-hot-toast';
+
+interface IntegrationStatus {
+  configured: boolean;
+  connected: boolean;
+  error?: string;
+}
+
+interface AIStatus {
+  openai: boolean;
+  model?: string;
+}
 
 export default function SettingsPage() {
   const navigate = useNavigate();
   const [preferences, setPreferences] = useState<UserPreference | null>(null);
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [googleConnected] = useState(false);
+  const [spotifyStatus, setSpotifyStatus] = useState<IntegrationStatus>({ configured: false, connected: false });
+  const [googleStatus, setGoogleStatus] = useState<IntegrationStatus>({ configured: false, connected: false });
+  const [aiStatus, setAiStatus] = useState<AIStatus>({ openai: false });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -27,12 +41,28 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const [prefsRes, spotifyRes] = await Promise.all([
+      const [prefsRes, statusRes] = await Promise.all([
         userApi.getPreferences(),
-        spotifyAuthApi.getStatus(),
+        api.get('/integrations/status').catch(() => ({ data: {} })),
       ]);
       setPreferences(prefsRes.data);
-      setSpotifyConnected(spotifyRes.data.connected);
+      
+      // Set integration statuses
+      const status = statusRes.data || {};
+      setSpotifyStatus({
+        configured: status.spotify?.configured || false,
+        connected: status.spotify?.connected || false,
+        error: status.spotify?.error,
+      });
+      setGoogleStatus({
+        configured: status.google?.configured || false,
+        connected: status.google?.connected || false,
+        error: status.google?.error,
+      });
+      setAiStatus({
+        openai: status.ai?.openai || false,
+        model: status.ai?.model || 'Not configured',
+      });
     } catch (error) {
       console.error('Failed to load settings:', error);
     } finally {
@@ -66,7 +96,7 @@ export default function SettingsPage() {
   const handleDisconnectSpotify = async () => {
     try {
       await spotifyAuthApi.disconnect();
-      setSpotifyConnected(false);
+      setSpotifyStatus(prev => ({ ...prev, connected: false }));
       toast.success('Spotify disconnected');
     } catch (error) {
       toast.error('Failed to disconnect Spotify');
@@ -244,59 +274,146 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* AI Model */}
+        <section>
+          <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <CpuChipIcon className="w-5 h-5" />
+            AI Model
+          </h2>
+          <div className="card">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                aiStatus.openai ? 'bg-purple-500/20' : 'bg-yellow-500/20'
+              }`}>
+                <CpuChipIcon className={`w-5 h-5 ${
+                  aiStatus.openai ? 'text-purple-400' : 'text-yellow-400'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-medium">OpenAI GPT-4</p>
+                <p className={`text-sm ${aiStatus.openai ? 'text-green-400' : 'text-yellow-400'}`}>
+                  {aiStatus.openai ? `✅ Active (${aiStatus.model})` : '⚠️ Not configured'}
+                </p>
+              </div>
+            </div>
+            {!aiStatus.openai && (
+              <div className="mt-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                <p className="text-yellow-400 text-xs flex items-start gap-2">
+                  <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>
+                    AI features require an OpenAI API key. The app will use demo content until configured.
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
         {/* Integrations */}
         <section>
           <h2 className="text-lg font-semibold text-white mb-3">Integrations</h2>
           <div className="space-y-3">
             {/* Spotify */}
-            <div className="card flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                <MusicalNoteIcon className="w-5 h-5 text-green-400" />
+            <div className="card">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  spotifyStatus.configured ? 'bg-green-500/20' : 'bg-yellow-500/20'
+                }`}>
+                  <MusicalNoteIcon className={`w-5 h-5 ${
+                    spotifyStatus.configured ? 'text-green-400' : 'text-yellow-400'
+                  }`} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-medium">Spotify</p>
+                  <p className={`text-sm ${
+                    spotifyStatus.connected ? 'text-green-400' : 
+                    spotifyStatus.configured ? 'text-white/50' : 'text-yellow-400'
+                  }`}>
+                    {spotifyStatus.connected ? '✅ Connected' : 
+                     spotifyStatus.configured ? 'Not connected' : '⚠️ Not configured'}
+                  </p>
+                </div>
+                {spotifyStatus.configured && (
+                  spotifyStatus.connected ? (
+                    <button
+                      onClick={handleDisconnectSpotify}
+                      className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30"
+                    >
+                      Disconnect
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleConnectSpotify}
+                      className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600"
+                    >
+                      Connect
+                    </button>
+                  )
+                )}
               </div>
-              <div className="flex-1">
-                <p className="text-white font-medium">Spotify</p>
-                <p className="text-white/50 text-sm">
-                  {spotifyConnected ? 'Connected' : 'Not connected'}
+              {!spotifyStatus.configured && (
+                <p className="text-yellow-400/70 text-xs mt-2">
+                  Requires Spotify API credentials to be configured on the server.
                 </p>
-              </div>
-              {spotifyConnected ? (
-                <button
-                  onClick={handleDisconnectSpotify}
-                  className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm hover:bg-red-500/30"
-                >
-                  Disconnect
-                </button>
-              ) : (
-                <button
-                  onClick={handleConnectSpotify}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600"
-                >
-                  Connect
-                </button>
               )}
             </div>
 
             {/* Google */}
-            <div className="card flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                <DocumentIcon className="w-5 h-5 text-blue-400" />
+            <div className="card">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  googleStatus.configured ? 'bg-blue-500/20' : 'bg-yellow-500/20'
+                }`}>
+                  <DocumentIcon className={`w-5 h-5 ${
+                    googleStatus.configured ? 'text-blue-400' : 'text-yellow-400'
+                  }`} />
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-medium">Google</p>
+                  <p className={`text-sm ${
+                    googleStatus.connected ? 'text-green-400' : 
+                    googleStatus.configured ? 'text-white/50' : 'text-yellow-400'
+                  }`}>
+                    {googleStatus.connected ? '✅ Connected' : 
+                     googleStatus.configured ? 'Not connected' : '⚠️ Not configured'}
+                  </p>
+                </div>
+                {googleStatus.configured && (
+                  <button
+                    onClick={handleConnectGoogle}
+                    className={`px-4 py-2 rounded-lg text-sm ${
+                      googleStatus.connected
+                        ? 'bg-white/10 text-white/60'
+                        : 'bg-blue-500 text-white hover:bg-blue-600'
+                    }`}
+                  >
+                    {googleStatus.connected ? 'Reconnect' : 'Connect'}
+                  </button>
+                )}
               </div>
-              <div className="flex-1">
-                <p className="text-white font-medium">Google</p>
-                <p className="text-white/50 text-sm">
-                  {googleConnected ? 'Connected' : 'Not connected'}
+              {!googleStatus.configured && (
+                <p className="text-yellow-400/70 text-xs mt-2">
+                  Requires Google OAuth credentials to be configured on the server.
                 </p>
+              )}
+            </div>
+
+            {/* YouTube */}
+            <div className="card">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <span className="text-lg">▶️</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-medium">YouTube</p>
+                  <p className="text-white/50 text-sm">
+                    Music and video search
+                  </p>
+                </div>
+                <span className="text-xs px-2 py-1 bg-green-500/20 text-green-400 rounded">
+                  Demo Mode
+                </span>
               </div>
-              <button
-                onClick={handleConnectGoogle}
-                className={`px-4 py-2 rounded-lg text-sm ${
-                  googleConnected
-                    ? 'bg-white/10 text-white/60'
-                    : 'bg-blue-500 text-white hover:bg-blue-600'
-                }`}
-              >
-                {googleConnected ? 'Reconnect' : 'Connect'}
-              </button>
             </div>
           </div>
         </section>

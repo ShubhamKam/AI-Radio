@@ -17,6 +17,57 @@ import {
 const router = Router();
 const prisma = new PrismaClient();
 
+// ============ Integration Status (public) ============
+
+// Get overall integration status
+router.get('/status', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { 
+        googleToken: true, 
+        spotifyToken: true 
+      },
+    });
+
+    // Check if API keys are configured
+    const googleConfigured = !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+    const spotifyConfigured = !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET);
+    const openaiConfigured = !!process.env.OPENAI_API_KEY;
+    const youtubeConfigured = !!process.env.YOUTUBE_API_KEY;
+
+    res.json({
+      google: {
+        configured: googleConfigured,
+        connected: !!(googleConfigured && user?.googleToken),
+        error: !googleConfigured ? 'Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET' : undefined,
+      },
+      spotify: {
+        configured: spotifyConfigured,
+        connected: !!(spotifyConfigured && user?.spotifyToken),
+        error: !spotifyConfigured ? 'Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET' : undefined,
+      },
+      youtube: {
+        configured: youtubeConfigured,
+        error: !youtubeConfigured ? 'Missing YOUTUBE_API_KEY' : undefined,
+      },
+      ai: {
+        openai: openaiConfigured,
+        model: openaiConfigured ? 'GPT-4' : 'Demo Mode',
+        error: !openaiConfigured ? 'Missing OPENAI_API_KEY' : undefined,
+      },
+    });
+  } catch (error) {
+    console.error('Status check error:', error);
+    res.json({
+      google: { configured: false, connected: false },
+      spotify: { configured: false, connected: false },
+      youtube: { configured: false },
+      ai: { openai: false, model: 'Demo Mode' },
+    });
+  }
+});
+
 // ============ Google Integration ============
 
 // Get Google auth URL
