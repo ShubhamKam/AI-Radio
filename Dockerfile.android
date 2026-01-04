@@ -1,0 +1,38 @@
+# Android APK Build Dockerfile
+FROM cimg/android:2024.01-node
+
+USER root
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY frontend/package*.json frontend/
+COPY backend/package*.json backend/
+
+# Install frontend dependencies
+WORKDIR /app/frontend
+RUN npm install
+
+# Copy frontend source
+COPY frontend/ .
+
+# Build frontend
+RUN npm run build
+
+# Add Android platform (if not exists) and sync
+RUN npx cap add android 2>/dev/null || true
+RUN npx cap sync android
+
+# Make gradlew executable
+RUN chmod +x android/gradlew
+
+# Build APK
+WORKDIR /app/frontend/android
+RUN ./gradlew assembleDebug --no-daemon
+
+# Create output script
+RUN echo '#!/bin/bash\ncp /app/frontend/android/app/build/outputs/apk/debug/app-debug.apk /output/ai-radio-debug.apk\necho "APK copied to output directory"' > /copy-apk.sh && chmod +x /copy-apk.sh
+
+# Default command
+CMD ["/copy-apk.sh"]

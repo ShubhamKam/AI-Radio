@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --radio-dark: #1a1a2e;
+  --radio-darker: #16213e;
+  --radio-accent: #e94560;
+  --radio-light: #f1f1f1;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--radio-dark);
+  color: var(--radio-light);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--radio-darker);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--radio-accent);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ff6b6b;
+}
+
+/* Radio dial animation */
+@keyframes dial-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(233, 69, 96, 0.6);
+  }
+}
+
+.dial-glow {
+  animation: dial-glow 2s ease-in-out infinite;
+}
+
+/* Vinyl spin animation */
+@keyframes vinyl-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vinyl-spin {
+  animation: vinyl-spin 3s linear infinite;
+}
+
+.vinyl-spin-paused {
+  animation-play-state: paused;
+}
+
+/* Sound wave animation */
+@keyframes sound-wave {
+  0%, 100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.sound-wave {
+  animation: sound-wave 0.5s ease-in-out infinite;
+}
+
+/* Gradient backgrounds */
+.bg-gradient-radio {
+  background: linear-gradient(135deg, var(--radio-dark) 0%, var(--radio-darker) 100%);
+}
+
+.bg-gradient-accent {
+  background: linear-gradient(135deg, var(--radio-accent) 0%, #ff6b6b 100%);
+}
+
+/* Glass morphism */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-radio-accent hover:bg-red-500 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95;
+}
+
+.btn-secondary {
+  @apply bg-white/10 hover:bg-white/20 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+}
+
+/* Input styles */
+.input-field {
+  @apply w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:border-radio-accent focus:ring-1 focus:ring-radio-accent transition-all duration-200;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white/5 rounded-xl p-4 border border-white/10 backdrop-blur-sm;
+}
+
+/* Safe area for mobile */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}

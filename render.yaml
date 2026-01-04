@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ai-radio-api
+    runtime: node
+    region: oregon
+    plan: free
+    branch: cursor/ai-radio-app-development-8c3a
+    rootDir: backend
+    buildCommand: npm install && npx prisma generate && npx prisma db push && npm run seed || true
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:./prod.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: FRONTEND_URL
+        value: "*"

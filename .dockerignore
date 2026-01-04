@@ -1,0 +1,62 @@
+# Node modules
+node_modules
+**/node_modules
+
+# Build outputs
+dist
+**/dist
+build
+**/build
+
+# Android build
+android
+**/android
+
+# iOS build (if any)
+ios
+**/ios
+
+# Environment files
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test coverage
+coverage
+**/coverage
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.temp
+
+# Database files (for development)
+*.db
+*.db-journal
+
+# Uploads (will be mounted as volume)
+uploads
+**/uploads
