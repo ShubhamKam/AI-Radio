@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
+
+// Get current API URL
+const getCurrentApiUrl = () => {
+  return localStorage.getItem('api_url') || import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -10,8 +15,33 @@ export default function LoginPage() {
   const [email, setEmail] = useState('demo@airadio.app');
   const [password, setPassword] = useState('demo123');
   const [isLoading, setIsLoading] = useState(false);
-  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [showServerConfig, setShowServerConfig] = useState(true); // Always show initially
   const [serverUrl, setServerUrl] = useState(localStorage.getItem('api_url') || '');
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  // Check server status on mount
+  useEffect(() => {
+    checkServerStatus();
+  }, []);
+
+  const checkServerStatus = async () => {
+    setServerStatus('checking');
+    try {
+      const baseUrl = getCurrentApiUrl().replace('/api', '');
+      const response = await fetch(`${baseUrl}/health`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      });
+      if (response.ok) {
+        setServerStatus('online');
+        setShowServerConfig(false); // Hide config if server is online
+      } else {
+        setServerStatus('offline');
+      }
+    } catch {
+      setServerStatus('offline');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +98,24 @@ export default function LoginPage() {
           <p className="text-white/60 mt-2">Your intelligent radio experience</p>
         </div>
 
+        {/* Server Status */}
+        <div className="mb-4 p-3 rounded-xl bg-white/5 border border-white/10">
+          <div className="flex items-center justify-between">
+            <span className="text-white/60 text-sm">Server Status:</span>
+            <span className={`text-sm font-medium flex items-center gap-1 ${
+              serverStatus === 'online' ? 'text-green-400' : 
+              serverStatus === 'offline' ? 'text-red-400' : 'text-yellow-400'
+            }`}>
+              {serverStatus === 'checking' && '⏳ Checking...'}
+              {serverStatus === 'online' && '✅ Online'}
+              {serverStatus === 'offline' && '❌ Offline'}
+            </span>
+          </div>
+          <p className="text-white/40 text-xs mt-1 truncate">
+            {getCurrentApiUrl()}
+          </p>
+        </div>
+
         {/* Server Config */}
         {showServerConfig && (
           <motion.div
@@ -75,20 +123,28 @@ export default function LoginPage() {
             animate={{ opacity: 1, height: 'auto' }}
             className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl"
           >
-            <p className="text-yellow-400 text-sm mb-2">⚠️ Server Configuration</p>
+            <p className="text-yellow-400 text-sm mb-2">⚙️ Enter Server URL</p>
             <input
               type="url"
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
-              placeholder="https://your-server.onrender.com/api"
+              placeholder="https://xxxxx.lhr.life/api"
               className="input-field mb-2 text-sm"
             />
-            <button
-              onClick={handleSaveServerUrl}
-              className="w-full py-2 bg-yellow-500 text-black rounded-lg text-sm font-medium"
-            >
-              Save & Reload
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveServerUrl}
+                className="flex-1 py-2 bg-yellow-500 text-black rounded-lg text-sm font-medium"
+              >
+                Save & Reload
+              </button>
+              <button
+                onClick={checkServerStatus}
+                className="px-3 py-2 bg-white/10 text-white rounded-lg text-sm"
+              >
+                Test
+              </button>
+            </div>
           </motion.div>
         )}
 
