@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+model User {
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  passwordHash            String?   @map("password_hash")
+  displayName             String?   @map("display_name")
+  avatarUrl               String?   @map("avatar_url")
+  oauthProvider           String?   @map("oauth_provider")
+  oauthId                 String?   @map("oauth_id")
+  spotifyToken            String?   @map("spotify_token") @db.Text
+  spotifyRefreshToken     String?   @map("spotify_refresh_token") @db.Text
+  spotifyTokenExpiresAt   DateTime? @map("spotify_token_expires_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  lastLoginAt             DateTime? @map("last_login_at")
+
+  preferences     UserPreferences?
+  content         Content[]
+  radioShows      RadioShow[]
+  listeningHistory ListeningHistory[]
+  likes           UserLike[]
+  library         UserLibrary[]
+
+  @@map("users")
+}
+
+model UserPreferences {
+  userId              String   @id @map("user_id")
+  preferredShowTypes  Json     @default("[]") @map("preferred_show_types")
+  preferredTopics     Json     @default("[]") @map("preferred_topics")
+  preferredVoice      String   @default("default") @map("preferred_voice")
+  musicPreference     String   @default("mixed") @map("music_preference")
+  notificationEnabled Boolean  @default(true) @map("notification_enabled")
+  autoplayEnabled     Boolean  @default(true) @map("autoplay_enabled")
+  contentFilter       Json     @default("{}") @map("content_filter")
+  theme               String   @default("auto")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Content {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  title            String
+  contentType      String   @map("content_type")
+  sourceType       String?  @map("source_type")
+  fileUrl          String?  @map("file_url") @db.Text
+  fileSize         BigInt?  @map("file_size")
+  mimeType         String?  @map("mime_type")
+  durationSeconds  Int?     @map("duration_seconds")
+  extractedText    String?  @map("extracted_text") @db.Text
+  summary          String?  @db.Text
+  topics           Json     @default("[]")
+  keywords         Json     @default("[]")
+  sentiment        String?
+  language         String   @default("en")
+  processingStatus String   @default("pending") @map("processing_status")
+  metadata         Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  embedding ContentEmbedding?
+
+  @@index([userId])
+  @@index([contentType])
+  @@index([processingStatus])
+  @@index([createdAt(sort: Desc)])
+  @@map("content")
+}
+
+model ContentEmbedding {
+  contentId      String   @id @map("content_id")
+  embeddingModel String   @map("embedding_model")
+  embedding      Unsupported("vector(1536)")?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@map("content_embeddings")
+}
+
+model RadioShow {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  title             String
+  description       String?   @db.Text
+  showType          String    @map("show_type")
+  durationSeconds   Int?      @map("duration_seconds")
+  script            String?   @db.Text
+  audioUrl          String?   @map("audio_url") @db.Text
+  status            String    @default("generating")
+  sourceContentIds  Json      @default("[]") @map("source_content_ids")
+  musicTracks       Json      @default("[]") @map("music_tracks")
+  playCount         Int       @default(0) @map("play_count")
+  likeCount         Int       @default(0) @map("like_count")
+  metadata          Json      @default("{}")
+  scheduledAt       DateTime? @map("scheduled_at")
+  generatedAt       DateTime? @map("generated_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("radio_shows")
+}
+
+model ListeningHistory {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  itemType           String   @map("item_type")
+  itemId             String   @map("item_id")
+  playDurationSeconds Int?    @map("play_duration_seconds")
+  completed          Boolean  @default(false)
+  progressSeconds    Int      @default(0) @map("progress_seconds")
+  playedAt           DateTime @default(now()) @map("played_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([playedAt(sort: Desc)])
+  @@map("listening_history")
+}
+
+model UserLike {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  itemType  String   @map("item_type")
+  itemId    String   @map("item_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemType, itemId])
+  @@index([userId])
+  @@map("user_likes")
+}
+
+model UserLibrary {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  itemType  String   @map("item_type")
+  itemId    String   @map("item_id")
+  folder    String   @default("default")
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemType, itemId])
+  @@map("user_library")
+}
+
+model MusicTrack {
+  id            String   @id @default(uuid())
+  source        String
+  sourceId      String   @map("source_id")
+  title         String?
+  artist        String?
+  album         String?
+  durationSeconds Int?   @map("duration_seconds")
+  thumbnailUrl  String?  @map("thumbnail_url") @db.Text
+  metadata      Json     @default("{}")
+  cachedAt      DateTime @default(now()) @map("cached_at")
+
+  @@unique([source, sourceId])
+  @@map("music_tracks")
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  jobType     String    @map("job_type")
+  status      String    @default("pending")
+  payload     Json?
+  result      Json?
+  error       String?   @db.Text
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([status])
+  @@index([jobType])
+  @@map("jobs")
+}
