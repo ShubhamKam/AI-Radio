@@ -1,0 +1,239 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: airadio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-airadio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-airadio_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-airadio}
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airadio}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - airadio-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: airadio-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-airadio_redis_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - airadio-network
+
+  # Elasticsearch (Optional - for search functionality)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: airadio-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - airadio-network
+    profiles:
+      - full  # Only start with --profile full
+
+  # Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: ${BUILD_TARGET:-development}
+    container_name: airadio-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-airadio}:${POSTGRES_PASSWORD:-airadio_dev_password}@postgres:5432/${POSTGRES_DB:-airadio}
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD:-airadio_redis_password}@redis:6379
+      
+      # Elasticsearch (optional)
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-change_this_in_production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      
+      # External APIs
+      NEWSAPI_KEY: ${NEWSAPI_KEY:-}
+      GNEWS_API_KEY: ${GNEWS_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      ALPHA_VANTAGE_KEY: ${ALPHA_VANTAGE_KEY:-}
+      
+      # AI/ML Services
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
+      
+      # CORS
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:8080}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - backend_logs:/app/logs
+    ports:
+      - "3000:3000"
+    networks:
+      - airadio-network
+    command: npm run dev
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      target: ${BUILD_TARGET:-development}
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:3000}
+    container_name: airadio-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:3000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+      - "8080:8080"
+    networks:
+      - airadio-network
+    command: npm run dev
+
+  # Adminer - Database Management UI (Development only)
+  adminer:
+    image: adminer:latest
+    container_name: airadio-adminer
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "8081:8080"
+    networks:
+      - airadio-network
+    profiles:
+      - tools
+
+  # Redis Commander - Redis Management UI (Development only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: airadio-redis-commander
+    restart: unless-stopped
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-airadio_redis_password}
+    ports:
+      - "8082:8081"
+    networks:
+      - airadio-network
+    profiles:
+      - tools
+
+  # Prometheus - Metrics Collection (Production)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: airadio-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    ports:
+      - "9090:9090"
+    networks:
+      - airadio-network
+    profiles:
+      - monitoring
+
+  # Grafana - Metrics Visualization (Production)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: airadio-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3001:3000"
+    networks:
+      - airadio-network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    name: airadio_postgres_data
+  redis_data:
+    name: airadio_redis_data
+  elasticsearch_data:
+    name: airadio_elasticsearch_data
+  backend_logs:
+    name: airadio_backend_logs
+  prometheus_data:
+    name: airadio_prometheus_data
+  grafana_data:
+    name: airadio_grafana_data
+
+networks:
+  airadio-network:
+    name: airadio-network
+    driver: bridge

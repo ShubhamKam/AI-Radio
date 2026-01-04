@@ -1,0 +1,35 @@
+# Development for Backend Dockerfile
+# This uses volume mounting for hot reload
+
+FROM node:20-alpine AS development
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    make \
+    g++ \
+    ffmpeg \
+    postgresql-client \
+    curl
+
+# Copy package files
+COPY backend/package*.json ./
+
+# Install all dependencies (including dev)
+RUN npm install
+
+# Copy source code
+COPY backend/ .
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Start with nodemon for hot reload
+CMD ["npm", "run", "dev"]
