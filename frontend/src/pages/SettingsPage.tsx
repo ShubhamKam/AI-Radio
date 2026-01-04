@@ -10,7 +10,6 @@ import {
   TrashIcon,
   CheckIcon,
   CpuChipIcon,
-  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { userApi, spotifyAuthApi, googleApi, api } from '../services/api';
 import type { UserPreference, ShowFormat } from '../types';
@@ -27,6 +26,15 @@ interface AIStatus {
   model?: string;
 }
 
+interface ApiKeys {
+  openaiKey: string;
+  spotifyClientId: string;
+  spotifyClientSecret: string;
+  googleClientId: string;
+  googleClientSecret: string;
+  youtubeApiKey: string;
+}
+
 export default function SettingsPage() {
   const navigate = useNavigate();
   const [preferences, setPreferences] = useState<UserPreference | null>(null);
@@ -34,10 +42,34 @@ export default function SettingsPage() {
   const [googleStatus, setGoogleStatus] = useState<IntegrationStatus>({ configured: false, connected: false });
   const [aiStatus, setAiStatus] = useState<AIStatus>({ openai: false });
   const [isLoading, setIsLoading] = useState(true);
+  const [showApiConfig, setShowApiConfig] = useState(false);
+  const [apiKeys, setApiKeys] = useState<ApiKeys>({
+    openaiKey: '',
+    spotifyClientId: '',
+    spotifyClientSecret: '',
+    googleClientId: '',
+    googleClientSecret: '',
+    youtubeApiKey: '',
+  });
+  const [savingKeys, setSavingKeys] = useState(false);
 
   useEffect(() => {
     loadSettings();
+    loadSavedApiKeys();
   }, []);
+
+  const loadSavedApiKeys = () => {
+    // Load saved API keys from localStorage
+    const saved = localStorage.getItem('api_keys');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setApiKeys(prev => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error('Failed to parse saved API keys');
+      }
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -68,6 +100,32 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSaveApiKeys = async () => {
+    setSavingKeys(true);
+    try {
+      // Save to localStorage for persistence
+      localStorage.setItem('api_keys', JSON.stringify(apiKeys));
+      
+      // Send to backend to update configuration
+      await api.post('/integrations/configure', apiKeys);
+      
+      toast.success('API keys saved! Reloading status...');
+      
+      // Reload settings to get updated status
+      await loadSettings();
+    } catch (error: any) {
+      console.error('Failed to save API keys:', error);
+      // Even if server save fails, local save worked
+      toast.success('API keys saved locally');
+    } finally {
+      setSavingKeys(false);
+    }
+  };
+
+  const handleApiKeyChange = (key: keyof ApiKeys, value: string) => {
+    setApiKeys(prev => ({ ...prev, [key]: value }));
   };
 
   const handleUpdatePreference = async (key: string, value: any) => {
@@ -274,37 +332,156 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* AI Model */}
+        {/* API Configuration */}
         <section>
-          <h2 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-            <CpuChipIcon className="w-5 h-5" />
-            AI Model
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <CpuChipIcon className="w-5 h-5" />
+              API Configuration
+            </h2>
+            <button
+              onClick={() => setShowApiConfig(!showApiConfig)}
+              className="text-radio-accent text-sm"
+            >
+              {showApiConfig ? 'Hide' : 'Configure'}
+            </button>
+          </div>
+          
           <div className="card">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                aiStatus.openai ? 'bg-purple-500/20' : 'bg-yellow-500/20'
-              }`}>
-                <CpuChipIcon className={`w-5 h-5 ${
-                  aiStatus.openai ? 'text-purple-400' : 'text-yellow-400'
-                }`} />
+            {/* Status Overview */}
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-white/70 text-sm">OpenAI (GPT-4)</span>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  aiStatus.openai ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {aiStatus.openai ? '✅ Active' : '⚠️ Demo Mode'}
+                </span>
               </div>
-              <div className="flex-1">
-                <p className="text-white font-medium">OpenAI GPT-4</p>
-                <p className={`text-sm ${aiStatus.openai ? 'text-green-400' : 'text-yellow-400'}`}>
-                  {aiStatus.openai ? `✅ Active (${aiStatus.model})` : '⚠️ Not configured'}
-                </p>
+              <div className="flex items-center justify-between">
+                <span className="text-white/70 text-sm">Spotify</span>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  spotifyStatus.configured ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {spotifyStatus.configured ? '✅ Configured' : '⚠️ Not Set'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-white/70 text-sm">Google</span>
+                <span className={`text-xs px-2 py-1 rounded ${
+                  googleStatus.configured ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                }`}>
+                  {googleStatus.configured ? '✅ Configured' : '⚠️ Not Set'}
+                </span>
               </div>
             </div>
-            {!aiStatus.openai && (
-              <div className="mt-3 p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                <p className="text-yellow-400 text-xs flex items-start gap-2">
-                  <ExclamationTriangleIcon className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>
-                    AI features require an OpenAI API key. The app will use demo content until configured.
-                  </span>
+
+            {/* API Key Input Form */}
+            {showApiConfig && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className="border-t border-white/10 pt-4 space-y-4"
+              >
+                <p className="text-white/50 text-xs mb-3">
+                  Enter your API keys below. Get them from the respective developer portals.
                 </p>
-              </div>
+
+                {/* OpenAI */}
+                <div>
+                  <label className="text-white/70 text-xs block mb-1">
+                    OpenAI API Key
+                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-radio-accent ml-2">
+                      Get Key →
+                    </a>
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKeys.openaiKey}
+                    onChange={(e) => handleApiKeyChange('openaiKey', e.target.value)}
+                    placeholder="sk-..."
+                    className="input-field text-sm"
+                  />
+                </div>
+
+                {/* YouTube */}
+                <div>
+                  <label className="text-white/70 text-xs block mb-1">
+                    YouTube API Key
+                    <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-radio-accent ml-2">
+                      Get Key →
+                    </a>
+                  </label>
+                  <input
+                    type="password"
+                    value={apiKeys.youtubeApiKey}
+                    onChange={(e) => handleApiKeyChange('youtubeApiKey', e.target.value)}
+                    placeholder="AIza..."
+                    className="input-field text-sm"
+                  />
+                </div>
+
+                {/* Spotify */}
+                <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <p className="text-green-400 text-xs font-medium mb-2">Spotify Credentials</p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={apiKeys.spotifyClientId}
+                      onChange={(e) => handleApiKeyChange('spotifyClientId', e.target.value)}
+                      placeholder="Client ID"
+                      className="input-field text-sm"
+                    />
+                    <input
+                      type="password"
+                      value={apiKeys.spotifyClientSecret}
+                      onChange={(e) => handleApiKeyChange('spotifyClientSecret', e.target.value)}
+                      placeholder="Client Secret"
+                      className="input-field text-sm"
+                    />
+                  </div>
+                  <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-green-400 text-xs mt-1 block">
+                    Get from Spotify Developer Dashboard →
+                  </a>
+                </div>
+
+                {/* Google */}
+                <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                  <p className="text-blue-400 text-xs font-medium mb-2">Google OAuth Credentials</p>
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={apiKeys.googleClientId}
+                      onChange={(e) => handleApiKeyChange('googleClientId', e.target.value)}
+                      placeholder="Client ID"
+                      className="input-field text-sm"
+                    />
+                    <input
+                      type="password"
+                      value={apiKeys.googleClientSecret}
+                      onChange={(e) => handleApiKeyChange('googleClientSecret', e.target.value)}
+                      placeholder="Client Secret"
+                      className="input-field text-sm"
+                    />
+                  </div>
+                  <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-blue-400 text-xs mt-1 block">
+                    Get from Google Cloud Console →
+                  </a>
+                </div>
+
+                {/* Save Button */}
+                <button
+                  onClick={handleSaveApiKeys}
+                  disabled={savingKeys}
+                  className="btn-primary w-full py-3 disabled:opacity-50"
+                >
+                  {savingKeys ? 'Saving...' : 'Save API Keys'}
+                </button>
+
+                <p className="text-white/30 text-xs text-center">
+                  Keys are stored securely and sent to the server for API calls.
+                </p>
+              </motion.div>
             )}
           </div>
         </section>

@@ -17,7 +17,66 @@ import {
 const router = Router();
 const prisma = new PrismaClient();
 
-// ============ Integration Status (public) ============
+// Store user-provided API keys in memory (in production, use secure storage)
+const userApiKeys: Record<string, Record<string, string>> = {};
+
+// Helper to get effective API key (user-provided or env)
+const getEffectiveKey = (userId: string, keyName: string): string | undefined => {
+  return userApiKeys[userId]?.[keyName] || process.env[keyName] || undefined;
+};
+
+// ============ API Key Configuration ============
+
+// Configure API keys from the app
+router.post('/configure', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { 
+      openaiKey, 
+      spotifyClientId, 
+      spotifyClientSecret, 
+      googleClientId, 
+      googleClientSecret,
+      youtubeApiKey 
+    } = req.body;
+
+    const userId = req.user!.id;
+
+    // Store keys for this user
+    if (!userApiKeys[userId]) {
+      userApiKeys[userId] = {};
+    }
+
+    if (openaiKey) userApiKeys[userId].OPENAI_API_KEY = openaiKey;
+    if (spotifyClientId) userApiKeys[userId].SPOTIFY_CLIENT_ID = spotifyClientId;
+    if (spotifyClientSecret) userApiKeys[userId].SPOTIFY_CLIENT_SECRET = spotifyClientSecret;
+    if (googleClientId) userApiKeys[userId].GOOGLE_CLIENT_ID = googleClientId;
+    if (googleClientSecret) userApiKeys[userId].GOOGLE_CLIENT_SECRET = googleClientSecret;
+    if (youtubeApiKey) userApiKeys[userId].YOUTUBE_API_KEY = youtubeApiKey;
+
+    // Also set as environment variables for immediate use (affects all users in this session)
+    if (openaiKey) process.env.OPENAI_API_KEY = openaiKey;
+    if (spotifyClientId) process.env.SPOTIFY_CLIENT_ID = spotifyClientId;
+    if (spotifyClientSecret) process.env.SPOTIFY_CLIENT_SECRET = spotifyClientSecret;
+    if (googleClientId) process.env.GOOGLE_CLIENT_ID = googleClientId;
+    if (googleClientSecret) process.env.GOOGLE_CLIENT_SECRET = googleClientSecret;
+    if (youtubeApiKey) process.env.YOUTUBE_API_KEY = youtubeApiKey;
+
+    res.json({ 
+      message: 'API keys configured successfully',
+      configured: {
+        openai: !!openaiKey || !!process.env.OPENAI_API_KEY,
+        spotify: !!(spotifyClientId && spotifyClientSecret) || !!(process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET),
+        google: !!(googleClientId && googleClientSecret) || !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+        youtube: !!youtubeApiKey || !!process.env.YOUTUBE_API_KEY,
+      }
+    });
+  } catch (error) {
+    console.error('Configure API keys error:', error);
+    res.status(500).json({ error: 'Failed to configure API keys' });
+  }
+});
+
+// ============ Integration Status ============
 
 // Get overall integration status
 router.get('/status', authenticate, async (req: AuthRequest, res) => {
