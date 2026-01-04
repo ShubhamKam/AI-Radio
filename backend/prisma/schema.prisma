@@ -1,0 +1,234 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String?
+  avatar        String?
+  googleToken   String?
+  spotifyToken  String?
+  spotifyRefresh String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  contents      Content[]
+  history       ListeningHistory[]
+  likes         Like[]
+  subscriptions Subscription[]
+  playlists     Playlist[]
+  preferences   UserPreference?
+}
+
+model Content {
+  id          String        @id @default(uuid())
+  userId      String
+  type        String        // AUDIO, VIDEO, DOCUMENT, TEXT, WEB_RESEARCH
+  title       String
+  description String?
+  sourceUrl   String?
+  filePath    String?
+  transcript  String?
+  summary     String?
+  topics      String        @default("[]") // JSON array stored as string
+  duration    Int?
+  status      String        @default("PROCESSING") // PROCESSING, READY, ERROR
+  metadata    String?       // JSON stored as string
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shows       ShowContent[]
+  nudges      KnowledgeNudge[]
+  likes       Like[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model RadioShow {
+  id          String        @id @default(uuid())
+  title       String
+  description String?
+  script      String
+  audioUrl    String?
+  duration    Int           @default(0)
+  format      String        // NEWS, TALK, EDUCATIONAL, ENTERTAINMENT, MUSIC_MIX
+  status      String        @default("DRAFT") // DRAFT, SCHEDULED, LIVE, ARCHIVED
+  channelId   String?
+  scheduledAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  contents    ShowContent[]
+  segments    ShowSegment[]
+
+  @@index([channelId])
+  @@index([status])
+}
+
+model ShowContent {
+  id        String    @id @default(uuid())
+  showId    String
+  contentId String
+
+  show      RadioShow @relation(fields: [showId], references: [id], onDelete: Cascade)
+  content   Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([showId, contentId])
+}
+
+model ShowSegment {
+  id        String    @id @default(uuid())
+  showId    String
+  type      String    // INTRO, CONTENT, MUSIC, NUDGE, TRANSITION, OUTRO
+  content   String
+  audioUrl  String?
+  startTime Int       @default(0)
+  duration  Int       @default(0)
+  order     Int       @default(0)
+
+  show      RadioShow @relation(fields: [showId], references: [id], onDelete: Cascade)
+
+  @@index([showId])
+}
+
+model KnowledgeNudge {
+  id        String   @id @default(uuid())
+  contentId String
+  text      String
+  audioUrl  String?
+  duration  Int      @default(0)
+  category  String?
+  createdAt DateTime @default(now())
+
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([contentId])
+}
+
+model ListeningHistory {
+  id        String   @id @default(uuid())
+  userId    String
+  itemType  String   // track, show, nudge
+  itemId    String
+  progress  Int      @default(0)
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  userId    String
+  contentId String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentId])
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  userId    String
+  topicId   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+}
+
+model Topic {
+  id            String         @id @default(uuid())
+  name          String         @unique
+  description   String?
+  createdAt     DateTime       @default(now())
+
+  subscriptions Subscription[]
+}
+
+model Playlist {
+  id        String         @id @default(uuid())
+  userId    String
+  name      String
+  isPublic  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     PlaylistItem[]
+
+  @@index([userId])
+}
+
+model PlaylistItem {
+  id         String   @id @default(uuid())
+  playlistId String
+  source     String   // youtube, spotify, local
+  sourceId   String
+  title      String
+  artist     String?
+  thumbnail  String?
+  duration   Int?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@index([playlistId])
+}
+
+model UserPreference {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  preferredTopics  String   @default("[]") // JSON array
+  preferredFormats String   @default("[]") // JSON array
+  autoRefresh      Boolean  @default(true)
+  refreshInterval  Int      @default(3600)
+  notificationsOn  Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ContentQueue {
+  id          String   @id @default(uuid())
+  type        String
+  priority    Int      @default(0)
+  data        String   // JSON stored as string
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  attempts    Int      @default(0)
+  lastError   String?
+  scheduledAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model WebResearch {
+  id        String   @id @default(uuid())
+  userId    String
+  query     String
+  mode      String   // wide, deep
+  results   String   // JSON stored as string
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}

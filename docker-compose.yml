@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # Redis for caching and job queues
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # Backend API server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=file:./dev.db
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_EXPIRES_IN=7d
+      - REDIS_URL=redis://redis:6379
+      - PORT=3001
+      - FRONTEND_URL=http://localhost:3000
+      - UPLOAD_DIR=./uploads
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - backend_uploads:/app/uploads
+    depends_on:
+      - redis
+    restart: unless-stopped
+    command: npm run dev
+
+  # Frontend React app
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:3001/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+    command: npm run dev -- --host
+
+volumes:
+  redis_data:
+  backend_uploads:
