@@ -5,7 +5,7 @@ const getApiUrl = () => {
   if (typeof window !== 'undefined' && localStorage.getItem('api_url')) {
     return localStorage.getItem('api_url')!;
   }
-  return import.meta.env.VITE_API_URL || 'https://ai-radio-api.onrender.com/api';
+  return import.meta.env.VITE_API_URL || 'https://2bfb0ba5a88ab2.lhr.life/api';
 };
 
 const API_URL = getApiUrl();
