@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '../stores/authStore';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 // Get current API URL
 const getCurrentApiUrl = () => {
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [showServerConfig, setShowServerConfig] = useState(true); // Always show initially
   const [serverUrl, setServerUrl] = useState(localStorage.getItem('api_url') || '');
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [errorDetails, setErrorDetails] = useState<string>('');
 
   // Check server status on mount
   useEffect(() => {
@@ -26,20 +28,30 @@ export default function LoginPage() {
 
   const checkServerStatus = async () => {
     setServerStatus('checking');
+    setErrorDetails('');
     try {
       const baseUrl = getCurrentApiUrl().replace('/api', '');
-      const response = await fetch(`${baseUrl}/health`, { 
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
+      const response = await axios.get(`${baseUrl}/health`, { 
+        timeout: 10000,
+        headers: {
+          'Accept': 'application/json',
+        }
       });
-      if (response.ok) {
+      if (response.data && response.data.status === 'ok') {
         setServerStatus('online');
         setShowServerConfig(false); // Hide config if server is online
+        setErrorDetails('');
       } else {
         setServerStatus('offline');
+        setErrorDetails('Server responded but not healthy');
       }
-    } catch {
+    } catch (err: any) {
       setServerStatus('offline');
+      // Capture detailed error info for debugging
+      const errMsg = err.message || 'Unknown error';
+      const errCode = err.code || '';
+      setErrorDetails(`${errCode}: ${errMsg}`);
+      console.error('Server check failed:', err);
     }
   };
 
@@ -102,18 +114,31 @@ export default function LoginPage() {
         <div className="mb-4 p-3 rounded-xl bg-white/5 border border-white/10">
           <div className="flex items-center justify-between">
             <span className="text-white/60 text-sm">Server Status:</span>
-            <span className={`text-sm font-medium flex items-center gap-1 ${
-              serverStatus === 'online' ? 'text-green-400' : 
-              serverStatus === 'offline' ? 'text-red-400' : 'text-yellow-400'
-            }`}>
-              {serverStatus === 'checking' && '⏳ Checking...'}
-              {serverStatus === 'online' && '✅ Online'}
-              {serverStatus === 'offline' && '❌ Offline'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium flex items-center gap-1 ${
+                serverStatus === 'online' ? 'text-green-400' : 
+                serverStatus === 'offline' ? 'text-red-400' : 'text-yellow-400'
+              }`}>
+                {serverStatus === 'checking' && '⏳ Checking...'}
+                {serverStatus === 'online' && '✅ Online'}
+                {serverStatus === 'offline' && '❌ Offline'}
+              </span>
+              <button 
+                onClick={checkServerStatus}
+                className="text-xs text-white/40 hover:text-white/60"
+              >
+                🔄
+              </button>
+            </div>
           </div>
           <p className="text-white/40 text-xs mt-1 truncate">
             {getCurrentApiUrl()}
           </p>
+          {errorDetails && (
+            <p className="text-red-400/70 text-xs mt-1 break-all">
+              Error: {errorDetails}
+            </p>
+          )}
         </div>
 
         {/* Server Config */}
