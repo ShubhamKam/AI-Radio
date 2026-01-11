@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AI Radio Cursor</string>
+    <string name="title_activity_main">AI Radio Cursor</string>
+    <string name="package_name">com.airadiocursor.app</string>
+    <string name="custom_url_scheme">com.airadiocursor.app</string>
+</resources>
