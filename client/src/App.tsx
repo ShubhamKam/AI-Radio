@@ -1,239 +1,240 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
-type Platform = 'youtube' | 'spotify'
-type SpotifyType = 'track' | 'playlist' | 'album' | 'artist' | 'episode' | 'show'
+import { App as CapApp } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
+import { storageGet, storageSet } from './lib/storage'
+import { spotifyConnect, spotifyGetToken, spotifySignOut, spotifySync, type SpotifyFeedItem } from './lib/spotify'
+import { youtubeConnect, youtubeGetToken, youtubeSignOut, youtubeSync, type YouTubeFeedItem } from './lib/googleYoutube'
 
-type MediaItem = {
-  id: string
-  platform: Platform
+type FeedPlatform = 'spotify' | 'youtube'
+
+type FeedItem = {
+  key: string
+  platform: FeedPlatform
   title: string
-  addedAt: number
-  youtube?: { videoId: string }
-  spotify?: { type: SpotifyType; itemId: string }
+  subtitle: string
+  imageUrl: string | null
+  embedUrl: string
 }
 
-function safeParseJson<T>(value: string | null): T | null {
-  if (!value) return null
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    return null
-  }
-}
-
-function youtubeIdFromUrl(raw: string): string | null {
-  try {
-    const url = new URL(raw)
-    const host = url.hostname.replace(/^www\./, '')
-
-    // https://youtu.be/<id>
-    if (host === 'youtu.be') {
-      const id = url.pathname.split('/').filter(Boolean)[0]
-      return id || null
-    }
-
-    // https://youtube.com/watch?v=<id>
-    if (host.endsWith('youtube.com')) {
-      const v = url.searchParams.get('v')
-      if (v) return v
-
-      // /shorts/<id>, /embed/<id>
-      const parts = url.pathname.split('/').filter(Boolean)
-      if (parts[0] === 'shorts' || parts[0] === 'embed') return parts[1] || null
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
-
-function spotifyFromUrl(raw: string): { type: SpotifyType; itemId: string } | null {
-  // spotify:track:<id>
-  if (raw.startsWith('spotify:')) {
-    const parts = raw.split(':')
-    if (parts.length >= 3) {
-      const type = parts[1] as SpotifyType
-      const itemId = parts[2]
-      if (itemId && ['track', 'playlist', 'album', 'artist', 'episode', 'show'].includes(type))
-        return { type, itemId }
-    }
-    return null
-  }
-
-  try {
-    const url = new URL(raw)
-    const host = url.hostname.replace(/^www\./, '')
-    if (!host.endsWith('spotify.com')) return null
-    const parts = url.pathname.split('/').filter(Boolean)
-    const type = parts[0] as SpotifyType
-    const itemId = parts[1]
-    if (!itemId) return null
-    if (!['track', 'playlist', 'album', 'artist', 'episode', 'show'].includes(type)) return null
-    return { type, itemId }
-  } catch {
-    return null
-  }
-}
-
-function embedUrl(item: MediaItem): string {
-  if (item.platform === 'youtube' && item.youtube) {
-    const vid = encodeURIComponent(item.youtube.videoId)
-    return `https://www.youtube-nocookie.com/embed/${vid}?playsinline=1`
-  }
-
-  if (item.platform === 'spotify' && item.spotify) {
-    const type = encodeURIComponent(item.spotify.type)
-    const id = encodeURIComponent(item.spotify.itemId)
-    return `https://open.spotify.com/embed/${type}/${id}`
-  }
-
-  return 'about:blank'
-}
-
-function newId(): string {
-  // good enough for local-only storage
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-const STORAGE_KEY = 'ai-radio-cursor.mediaItems.v1'
+const FEED_CACHE_KEY = 'ai-radio-cursor.feedCache.v1'
 
 function App() {
-  const [url, setUrl] = useState('')
-  const [title, setTitle] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
 
-  const [items, setItems] = useState<MediaItem[]>(() => {
-    const parsed = safeParseJson<MediaItem[]>(localStorage.getItem(STORAGE_KEY))
-    return Array.isArray(parsed) ? parsed : []
-  })
+  const [spotifyConnected, setSpotifyConnected] = useState(false)
+  const [youtubeConnected, setYoutubeConnected] = useState(false)
 
-  const [activeId, setActiveId] = useState<string | null>(() => {
-    const first = safeParseJson<MediaItem[]>(localStorage.getItem(STORAGE_KEY))
-    return Array.isArray(first) && first.length > 0 ? first[0].id : null
-  })
+  const [feed, setFeed] = useState<FeedItem[]>([])
+  const [activeKey, setActiveKey] = useState<string | null>(null)
 
-  const active = items.find((i) => i.id === activeId) ?? null
+  const active = useMemo(() => feed.find((f) => f.key === activeKey) ?? null, [feed, activeKey])
 
-  function persist(next: MediaItem[]) {
-    setItems(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  async function loadConnectionState() {
+    const sp = await spotifyGetToken()
+    const yt = await youtubeGetToken()
+    setSpotifyConnected(Boolean(sp?.accessToken))
+    setYoutubeConnected(Boolean(yt?.accessToken))
   }
 
-  function addFromUrl() {
+  async function loadCachedFeed() {
+    const raw = await storageGet(FEED_CACHE_KEY)
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw) as FeedItem[]
+      if (Array.isArray(parsed)) {
+        setFeed(parsed)
+        setActiveKey(parsed[0]?.key ?? null)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function syncAll() {
     setError(null)
+    setBusy('sync')
+    try {
+      const merged: FeedItem[] = []
 
-    const trimmed = url.trim()
-    if (!trimmed) {
-      setError('Paste a YouTube or Spotify URL (or a spotify: URI).')
-      return
-    }
-
-    const yt = youtubeIdFromUrl(trimmed)
-    if (yt) {
-      const item: MediaItem = {
-        id: newId(),
-        platform: 'youtube',
-        title: title.trim() || 'YouTube video',
-        addedAt: Date.now(),
-        youtube: { videoId: yt }
+      if (spotifyConnected) {
+        const sp: SpotifyFeedItem[] = await spotifySync()
+        merged.push(
+          ...sp.map((x) => ({
+            key: `spotify:${x.type}:${x.id}`,
+            platform: 'spotify' as const,
+            title: x.title,
+            subtitle: x.subtitle,
+            imageUrl: x.imageUrl,
+            embedUrl: x.embedUrl
+          }))
+        )
       }
-      const next = [item, ...items]
-      persist(next)
-      setActiveId(item.id)
-      setUrl('')
-      setTitle('')
-      return
-    }
 
-    const sp = spotifyFromUrl(trimmed)
-    if (sp) {
-      const item: MediaItem = {
-        id: newId(),
-        platform: 'spotify',
-        title: title.trim() || `Spotify ${sp.type}`,
-        addedAt: Date.now(),
-        spotify: { type: sp.type, itemId: sp.itemId }
+      if (youtubeConnected) {
+        const yt: YouTubeFeedItem[] = await youtubeSync()
+        merged.push(
+          ...yt
+            .filter((x) => x.embedUrl !== 'about:blank')
+            .map((x) => ({
+              key: `youtube:${x.type}:${x.id}`,
+              platform: 'youtube' as const,
+              title: x.title,
+              subtitle: x.subtitle,
+              imageUrl: x.imageUrl,
+              embedUrl: x.embedUrl
+            }))
+        )
       }
-      const next = [item, ...items]
-      persist(next)
-      setActiveId(item.id)
-      setUrl('')
-      setTitle('')
-      return
-    }
 
-    setError('Could not parse that URL. Try a standard YouTube or open.spotify.com link.')
+      setFeed(merged)
+      setActiveKey((prev) => prev ?? merged[0]?.key ?? null)
+      await storageSet(FEED_CACHE_KEY, JSON.stringify(merged))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(null)
+    }
   }
 
-  function remove(id: string) {
-    const next = items.filter((i) => i.id !== id)
-    persist(next)
-    if (activeId === id) setActiveId(next[0]?.id ?? null)
-  }
+  useEffect(() => {
+    void (async () => {
+      await loadConnectionState()
+      await loadCachedFeed()
+    })()
+  }, [])
+
+  useEffect(() => {
+    // Auto-sync on app resume (native)
+    if (!Capacitor.isNativePlatform()) return
+    let removed = false
+    let handle: { remove: () => Promise<void> | void } | null = null
+
+    void CapApp.addListener('resume', () => {
+      void loadConnectionState().then(() => void syncAll())
+    }).then((h) => {
+      if (removed) {
+        void h.remove()
+        return
+      }
+      handle = h
+    })
+
+    return () => {
+      removed = true
+      if (handle) void handle.remove()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spotifyConnected, youtubeConnected])
+
+  useEffect(() => {
+    // Auto-sync on initial connect state
+    if (spotifyConnected || youtubeConnected) void syncAll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spotifyConnected, youtubeConnected])
 
   return (
     <div className="app">
       <header className="header">
         <div className="brand">
           <div className="brandTitle">AI Radio Cursor</div>
-          <div className="brandSubtitle">YouTube + Spotify inside one player</div>
+          <div className="brandSubtitle">OAuth sync + in-app playback (YouTube / Spotify)</div>
         </div>
       </header>
 
       <main className="main">
         <section className="panel">
-          <h2 className="panelTitle">Add content</h2>
-          <div className="formRow">
-            <label className="label">
-              Title (optional)
-              <input
-                className="input"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Chill mix / My playlist"
-              />
-            </label>
-          </div>
-          <div className="formRow">
-            <label className="label">
-              YouTube / Spotify URL
-              <input
-                className="input"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://youtu.be/... or https://open.spotify.com/track/..."
-              />
-            </label>
-          </div>
+          <h2 className="panelTitle">Accounts</h2>
           <div className="actions">
-            <button className="button" onClick={addFromUrl}>
-              Add to library
+            <button
+              className="button"
+              disabled={busy !== null}
+              onClick={async () => {
+                setError(null)
+                setBusy('spotify')
+                try {
+                  await spotifyConnect()
+                  await loadConnectionState()
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e))
+                } finally {
+                  setBusy(null)
+                }
+              }}
+            >
+              {spotifyConnected ? 'Spotify connected' : 'Connect Spotify'}
             </button>
-            <button className="buttonSecondary" onClick={() => persist([])} disabled={items.length === 0}>
-              Clear library
+            <button
+              className="buttonSecondary"
+              disabled={busy !== null || !spotifyConnected}
+              onClick={async () => {
+                await spotifySignOut()
+                await loadConnectionState()
+              }}
+            >
+              Sign out
             </button>
           </div>
-          {error ? <div className="error">{error}</div> : null}
+          <div className="actions" style={{ marginTop: 10 }}>
+            <button
+              className="button"
+              disabled={busy !== null}
+              onClick={async () => {
+                setError(null)
+                setBusy('youtube')
+                try {
+                  await youtubeConnect()
+                  await loadConnectionState()
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e))
+                } finally {
+                  setBusy(null)
+                }
+              }}
+            >
+              {youtubeConnected ? 'YouTube connected' : 'Connect YouTube'}
+            </button>
+            <button
+              className="buttonSecondary"
+              disabled={busy !== null || !youtubeConnected}
+              onClick={async () => {
+                await youtubeSignOut()
+                await loadConnectionState()
+              }}
+            >
+              Sign out
+            </button>
+          </div>
 
           <h2 className="panelTitle" style={{ marginTop: 18 }}>
-            Library
+            Synced feed
           </h2>
-          {items.length === 0 ? (
-            <div className="empty">No items yet. Paste a YouTube or Spotify link above.</div>
+          <div className="actions">
+            <button className="button" disabled={busy !== null || (!spotifyConnected && !youtubeConnected)} onClick={syncAll}>
+              {busy === 'sync' ? 'Syncing…' : 'Sync now'}
+            </button>
+            <div className="hint" style={{ marginTop: 0 }}>
+              Auto-sync runs on app open / resume.
+            </div>
+          </div>
+
+          {error ? <div className="error">{error}</div> : null}
+
+          {feed.length === 0 ? (
+            <div className="empty">
+              Connect Spotify/YouTube to automatically pull your content (recently played, playlists, uploads, etc.).
+            </div>
           ) : (
             <ul className="list">
-              {items.map((item) => {
-                const isActive = item.id === activeId
+              {feed.map((item) => {
+                const isActive = item.key === activeKey
                 return (
-                  <li key={item.id} className={`listItem ${isActive ? 'active' : ''}`}>
-                    <button className="listSelect" onClick={() => setActiveId(item.id)}>
+                  <li key={item.key} className={`listItem ${isActive ? 'active' : ''}`}>
+                    <button className="listSelect" onClick={() => setActiveKey(item.key)}>
                       <span className={`pill ${item.platform}`}>{item.platform}</span>
                       <span className="itemTitle">{item.title}</span>
-                    </button>
-                    <button className="listDelete" onClick={() => remove(item.id)} aria-label="Remove">
-                      ✕
                     </button>
                   </li>
                 )
@@ -245,7 +246,7 @@ function App() {
         <section className="panel playerPanel">
           <h2 className="panelTitle">Now playing</h2>
           {!active ? (
-            <div className="empty">Select an item from the library.</div>
+            <div className="empty">Select an item from your synced feed.</div>
           ) : (
             <>
               <div className="nowPlayingMeta">
@@ -254,8 +255,8 @@ function App() {
               </div>
               <div className="playerFrame">
                 <iframe
-                  key={active.id}
-                  src={embedUrl(active)}
+                  key={active.key}
+                  src={active.embedUrl}
                   title={active.title}
                   loading="lazy"
                   referrerPolicy="strict-origin-when-cross-origin"
@@ -264,7 +265,7 @@ function App() {
                 />
               </div>
               <div className="hint">
-                Tip: playback is controlled inside the embedded player (YouTube / Spotify).
+                Playback is controlled inside the embedded player (YouTube / Spotify).
               </div>
             </>
           )}

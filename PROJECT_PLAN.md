@@ -17,6 +17,10 @@ This document is intended to be **kept up to date** as features are added. It is
 
 ### MVP features
 
+- **Android app (Capacitor)**
+  - Authenticate with **Spotify** and **YouTube** via OAuth (PKCE) from the UI.
+  - Automatically pull (“sync”) user content into the app (where APIs allow).
+  - Play synced content inside an in-app player.
 - **Station playlist generation**
   - Generate an ordered “radio hour” from a topic/genre prompt.
   - Persist a schedule (tracks/segments with timestamps and metadata).
@@ -75,6 +79,34 @@ This document is intended to be **kept up to date** as features are added. It is
     - Subtask: Add `.devcontainer/devcontainer.json`
     - Subtask: Add `.dockerignore`
     - Subtask: Document usage in README
+
+### Epic: Android App (Capacitor) — OAuth + Sync + Player
+
+- **Story**: As a user, I can connect Spotify from the app UI (OAuth/PKCE).
+  - **Task**: Implement Spotify OAuth
+    - Subtask: PKCE + deep-link redirect handling
+    - Subtask: Store/refresh tokens
+    - Subtask: Sync recently played, playlists, saved albums
+
+- **Story**: As a user, I can connect YouTube from the app UI (Google OAuth/PKCE).
+  - **Task**: Implement YouTube OAuth
+    - Subtask: PKCE + deep-link redirect handling
+    - Subtask: Store/refresh tokens
+    - Subtask: Sync user uploads + playlists (note: watch history/feed limitations)
+
+- **Story**: As a user, I see my synced content automatically (no URL pasting).
+  - **Task**: Auto-sync policy
+    - Subtask: Sync on app open/resume + manual “Sync now”
+    - Subtask: Cache last synced feed locally for offline viewing
+
+- **Story**: As a user, I can play items inside the app.
+  - **Task**: In-app player
+    - Subtask: Render embedded YouTube player for videos
+    - Subtask: Render embedded Spotify player for tracks/playlists/albums
+
+- **Story**: As a developer, I can build an APK.
+  - **Task**: CI build
+    - Subtask: GitHub Actions workflow builds and uploads debug APK artifact
 
 - **Story**: As a developer, I can manage dependencies and reproducible builds.
   - **Task**: Choose language/runtime (Node, Python, etc.) when implementation starts
