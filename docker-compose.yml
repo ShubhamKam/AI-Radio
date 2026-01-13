@@ -1,0 +1,116 @@
+# AI Radio Content Categorizer - Docker Compose Configuration
+# Use this for local development and testing
+
+version: '3.8'
+
+services:
+  ai-radio-categorizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-radio-categorizer
+    image: ai-radio-categorizer:latest
+    
+    # Mount volumes for persistent data
+    volumes:
+      # Data directory (database, cache)
+      - ai-radio-data:/data
+      # Configuration files
+      - ./config:/config:ro
+      # Log files
+      - ai-radio-logs:/logs
+      # Source code (for development)
+      - ./src:/app/src:ro
+      # Bookmarks import directory
+      - ./bookmarks:/bookmarks:ro
+    
+    # Environment variables
+    environment:
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+      - LOG_DIR=/logs
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      # API Keys (from .env file)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Networking
+    networks:
+      - ai-radio-network
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Interactive mode for OAuth setup
+    stdin_open: true
+    tty: true
+
+  # Optional: Scheduled runner service
+  ai-radio-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-radio-scheduler
+    image: ai-radio-categorizer:latest
+    
+    volumes:
+      - ai-radio-data:/data
+      - ./config:/config:ro
+      - ai-radio-logs:/logs
+    
+    environment:
+      - DATA_DIR=/data
+      - CONFIG_DIR=/config
+      - LOG_DIR=/logs
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+    
+    # Run full pipeline every 6 hours
+    command: >
+      sh -c "while true; do
+        echo '=== Starting scheduled run at $(date) ===';
+        python -m src.main --full --log-level INFO;
+        echo '=== Completed at $(date), sleeping 6 hours ===';
+        sleep 21600;
+      done"
+    
+    networks:
+      - ai-radio-network
+    
+    restart: unless-stopped
+    
+    # Only start if main service is running
+    depends_on:
+      - ai-radio-categorizer
+    
+    # Disable by default (uncomment to enable)
+    profiles:
+      - scheduler
+
+# Named volumes for persistence
+volumes:
+  ai-radio-data:
+    name: ai-radio-data
+  ai-radio-logs:
+    name: ai-radio-logs
+
+# Networks
+networks:
+  ai-radio-network:
+    name: ai-radio-network
+    driver: bridge
