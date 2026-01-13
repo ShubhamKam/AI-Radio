@@ -1,0 +1,53 @@
+version: 1
+
+# These categories are designed for AI-driven radio content creation.
+# The LLM is instructed to pick ONE primary_category and any number of tags.
+
+primary_categories:
+  - name: "Tech & AI"
+    description: "AI research, products, security, startups, developer tools."
+  - name: "Business & Markets"
+    description: "Companies, earnings, economy, investing, consumer trends."
+  - name: "Politics & Policy"
+    description: "Government, law, geopolitics, regulation, elections."
+  - name: "Science & Health"
+    description: "Medicine, wellness, climate, space, scientific discoveries."
+  - name: "Culture & Society"
+    description: "Media, arts, lifestyle, communities, social change."
+  - name: "Education & How-To"
+    description: "Tutorials, guides, explainers, learning resources."
+  - name: "Creators & Media"
+    description: "Podcasts, YouTube, writing, creator economy, production tips."
+  - name: "Local & Regional"
+    description: "Location-specific stories and community issues."
+
+tag_vocabulary:
+  formats:
+    - "headline"
+    - "explainer"
+    - "deep-dive"
+    - "debate"
+    - "interview"
+    - "monologue"
+    - "roundup"
+    - "how-to"
+    - "narrative"
+  production:
+    - "needs-fact-check"
+    - "needs-guest"
+    - "needs-b-roll"
+    - "good-cold-open"
+    - "good-soundbite"
+  timing:
+    - "breaking"
+    - "timely"
+    - "evergreen"
+  risk:
+    - "copyright-risk"
+    - "medical-claims-risk"
+    - "legal-risk"
+    - "low-risk"
+  audience:
+    - "beginner"
+    - "intermediate"
+    - "advanced"
