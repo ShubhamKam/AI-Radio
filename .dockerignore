@@ -1,0 +1,73 @@
+# Docker ignore file
+# Prevents unnecessary files from being copied to the Docker image
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Documentation
+docs/_build/
+
+# Local development
+*.log
+*.sqlite
+*.db
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Credentials (never include in image)
+credentials.json
+token.json
+*.pem
+*.key
+
+# Large files
+*.mp3
+*.mp4
+*.pdf
+*.zip
+*.tar.gz
