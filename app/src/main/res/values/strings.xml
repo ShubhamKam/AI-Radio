@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI Agent</string>
+    <string name="chat_hint">Type your message...</string>
+    <string name="send">Send</string>
+    <string name="ai_thinking">AI is thinking...</string>
+    <string name="error_message">Something went wrong. Please try again.</string>
+    <string name="no_apps_found">No apps found</string>
+    <string name="app_launched">App launched successfully</string>
+</resources>
