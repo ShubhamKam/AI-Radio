@@ -1,13 +1,9 @@
 package com.example.aiaagent.data.model
 
-data class AIResponse(
-    val content: String,
+data class AgentResponse(
     val provider: AIProvider,
+    val message: String,
+    val reasoning: String,
+    val toolAction: ToolAction? = null,
     val timestamp: Long = System.currentTimeMillis()
 )
-
-enum class AIProvider {
-    OPENAI,
-    GOOGLE_AI,
-    LOCAL_MODEL
-}
