@@ -1,6 +1,16 @@
 # Android AI Agent
 
+[![Android CI](https://github.com/ShubhamKam/AI-Radio/actions/workflows/android-build.yml/badge.svg)](https://github.com/ShubhamKam/AI-Radio/actions/workflows/android-build.yml)
+[![Release](https://img.shields.io/github/v/release/ShubhamKam/AI-Radio)](https://github.com/ShubhamKam/AI-Radio/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 An intelligent Android application that combines cloud AI models (OpenAI GPT-4, Google Gemini) with local device capabilities through a conversational chat interface. The AI agent can interact with Android apps and system tools to help users accomplish tasks naturally.
+
+## 📥 Download
+
+**Latest Release**: [Download APK](https://github.com/ShubhamKam/AI-Radio/releases/latest)
+
+Or build from source using the instructions below.
 
 ## 🌟 Features
 
@@ -34,10 +44,18 @@ An intelligent Android application that combines cloud AI models (OpenAI GPT-4, 
 
 ### Installation
 
+#### Option 1: Download Pre-built APK (Recommended)
+1. Go to [Releases](https://github.com/ShubhamKam/AI-Radio/releases/latest)
+2. Download the latest `app-debug.apk` or `AIAgent-vX.X.X.apk`
+3. Enable "Install from Unknown Sources" in Android settings
+4. Install the APK on your device
+5. Configure API keys in the app settings
+
+#### Option 2: Build from Source
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd AIAAgent
+   git clone https://github.com/ShubhamKam/AI-Radio.git
+   cd AI-Radio
    ```
 
 2. **Open in Android Studio**
@@ -55,6 +73,12 @@ An intelligent Android application that combines cloud AI models (OpenAI GPT-4, 
    - Tap the settings icon (⚙️)
    - Enter your OpenAI or Google AI API key
    - Select your preferred AI provider
+
+#### Option 3: Automated Build (GitHub Actions)
+Every push to `main` automatically builds APKs via GitHub Actions:
+- Navigate to [Actions](https://github.com/ShubhamKam/AI-Radio/actions)
+- Select the latest workflow run
+- Download artifacts: `app-debug` or `app-release`
 
 ### Getting API Keys
 
