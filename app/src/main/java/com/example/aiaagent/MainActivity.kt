@@ -9,9 +9,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aiaagent.ui.theme.AIAAgentTheme
+import com.example.aiaagent.ui.AppNavigation
 import com.example.aiaagent.ui.ChatScreen
 import com.example.aiaagent.viewmodel.ChatViewModel
+import com.example.aiaagent.viewmodel.SettingsViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,7 +25,13 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ChatScreen(ChatViewModel())
+                    val chatViewModel: ChatViewModel = viewModel()
+                    val settingsViewModel: SettingsViewModel = viewModel()
+                    
+                    AppNavigation(
+                        chatViewModel = chatViewModel,
+                        settingsViewModel = settingsViewModel
+                    )
                 }
             }
         }
@@ -33,6 +42,6 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GreetingPreview() {
     AIAAgentTheme {
-        ChatScreen(ChatViewModel())
+        // Preview not available for ViewModels requiring Application context
     }
 }
