@@ -1,0 +1,6 @@
+{
+    "api_key": "YOUR_GEMINI_OR_OPENAI_KEY",
+    "bookmark_path": "data/bookmarks/bookmarks.html",
+    "content_dirs": ["data/content"],
+    "drive_folder_id": "YOUR_DRIVE_FOLDER_ID"
+}
