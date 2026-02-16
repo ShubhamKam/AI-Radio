@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.aiaagent.tools.termux.TermuxBridge
 import com.example.aiaagent.viewmodel.ChatViewModel
 import com.example.aiaagent.viewmodel.SettingsViewModel
 
@@ -25,6 +26,15 @@ fun AppNavigation(
             SettingsScreen(
                 viewModel = settingsViewModel,
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable("termux_setup") {
+            TermuxSetupScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenTermux = {
+                    // This will be handled via the TermuxBridge in the activity context
+                    navController.popBackStack()
+                }
             )
         }
     }

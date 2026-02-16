@@ -14,6 +14,8 @@ import com.example.aiaagent.data.service.ConversationMessage
 import com.example.aiaagent.data.service.ToolCallRequest
 import com.example.aiaagent.tools.ToolRegistry
 import com.example.aiaagent.tools.ToolResult
+import com.example.aiaagent.tools.termux.TermuxBridge
+import com.example.aiaagent.tools.termux.TermuxStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,24 +23,25 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
-    
+
     private val chatRepository = ChatRepository()
     private val settingsRepository = SettingsRepository(application)
     private val aiService: AIService = AIServiceImpl(application)
     private val toolRegistry = ToolRegistry(application)
-    
+    private val termuxBridge = TermuxBridge(application)
+
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
-    
+
     private val conversationHistory = mutableListOf<ConversationMessage>()
-    
+
     init {
         viewModelScope.launch {
             chatRepository.messages.collect { messages ->
                 _uiState.value = _uiState.value.copy(messages = messages)
             }
         }
-        
+
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _uiState.value = _uiState.value.copy(
@@ -51,33 +54,40 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+
+        // Check Termux status on init
+        checkTermuxStatus()
     }
-    
+
+    fun checkTermuxStatus() {
+        val status = termuxBridge.getTermuxStatus()
+        _uiState.value = _uiState.value.copy(termuxStatus = status)
+    }
+
     fun sendMessage(content: String) {
         if (content.isBlank()) return
-        
+
         viewModelScope.launch {
-            // Add user message
             val userMessage = Message(
                 id = UUID.randomUUID().toString(),
                 content = content,
                 isFromUser = true
             )
             chatRepository.addMessage(userMessage)
-            
-            // Add to conversation history
-            conversationHistory.add(ConversationMessage(
-                role = "user",
-                content = content
-            ))
-            
+
+            conversationHistory.add(
+                ConversationMessage(
+                    role = "user",
+                    content = content
+                )
+            )
+
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
-            // Get AI response
+
             processAIResponse(content)
         }
     }
-    
+
     private suspend fun processAIResponse(userPrompt: String) {
         val settings = settingsRepository.settings.value
         val apiKey = when (settings.selectedProvider) {
@@ -85,7 +95,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             AIProvider.GOOGLE_AI -> settings.googleAIApiKey
             AIProvider.LOCAL_MODEL -> ""
         }
-        
+
         if (apiKey.isBlank() && settings.selectedProvider != AIProvider.LOCAL_MODEL) {
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
@@ -93,9 +103,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        
+
         val availableTools = toolRegistry.getAllTools()
-        
+
         val result = aiService.generateResponse(
             prompt = userPrompt,
             conversationHistory = conversationHistory,
@@ -103,26 +113,26 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             provider = settings.selectedProvider,
             apiKey = apiKey
         )
-        
+
         when (result) {
             is AIServiceResult.Success -> {
-                // Check if there are tool calls
                 if (result.toolCalls != null && result.toolCalls.isNotEmpty()) {
                     handleToolCalls(result.toolCalls, result.response)
                 } else {
-                    // Add assistant response
                     val assistantMessage = Message(
                         id = UUID.randomUUID().toString(),
                         content = result.response,
                         isFromUser = false
                     )
                     chatRepository.addMessage(assistantMessage)
-                    
-                    conversationHistory.add(ConversationMessage(
-                        role = "assistant",
-                        content = result.response
-                    ))
-                    
+
+                    conversationHistory.add(
+                        ConversationMessage(
+                            role = "assistant",
+                            content = result.response
+                        )
+                    )
+
                     _uiState.value = _uiState.value.copy(isLoading = false)
                 }
             }
@@ -131,7 +141,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     error = result.message
                 )
-                
+
                 val errorMessage = Message(
                     id = UUID.randomUUID().toString(),
                     content = "Error: ${result.message}",
@@ -141,68 +151,63 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    
+
     private suspend fun handleToolCalls(toolCalls: List<ToolCallRequest>, assistantMessage: String) {
-        // Show tool execution indicator
         val toolMessage = Message(
             id = UUID.randomUUID().toString(),
-            content = "🔧 Executing tools: ${toolCalls.joinToString(", ") { it.name }}",
+            content = "🔧 Executing: ${toolCalls.joinToString(", ") { it.name }}",
             isFromUser = false
         )
         chatRepository.addMessage(toolMessage)
-        
-        // Execute each tool
-        val toolResults = mutableListOf<Pair<ToolCallRequest, ToolResult>>()
-        
+
         for (toolCall in toolCalls) {
             val result = toolRegistry.executeTool(toolCall.name, toolCall.arguments)
-            toolResults.add(toolCall to result)
-            
-            // Add tool result message
+
             val resultContent = when (result) {
                 is ToolResult.Success -> result.result
                 is ToolResult.Error -> "Error: ${result.message}"
             }
-            
+
             val resultMessage = Message(
                 id = UUID.randomUUID().toString(),
-                content = "📋 ${toolCall.name}: $resultContent",
+                content = "📋 ${toolCall.name}:\n$resultContent",
                 isFromUser = false
             )
             chatRepository.addMessage(resultMessage)
-            
-            // Add to conversation history
-            conversationHistory.add(ConversationMessage(
-                role = "tool",
-                content = resultContent,
-                toolCallId = toolCall.id,
-                toolName = toolCall.name
-            ))
+
+            conversationHistory.add(
+                ConversationMessage(
+                    role = "tool",
+                    content = resultContent,
+                    toolCallId = toolCall.id,
+                    toolName = toolCall.name
+                )
+            )
         }
-        
-        // Add assistant message with tool calls to history
-        conversationHistory.add(ConversationMessage(
-            role = "assistant",
-            content = assistantMessage,
-            toolCalls = toolCalls
-        ))
-        
-        // Get final response from AI with tool results
+
+        conversationHistory.add(
+            ConversationMessage(
+                role = "assistant",
+                content = assistantMessage,
+                toolCalls = toolCalls
+            )
+        )
+
         val settings = settingsRepository.settings.value
         val apiKey = when (settings.selectedProvider) {
             AIProvider.OPENAI -> settings.openAIApiKey
             AIProvider.GOOGLE_AI -> settings.googleAIApiKey
             AIProvider.LOCAL_MODEL -> ""
         }
-        
+
         val finalResult = aiService.generateResponse(
             prompt = "Based on the tool results above, provide a helpful response to the user.",
             conversationHistory = conversationHistory,
-            availableTools = emptyList(), // Don't allow more tool calls in final response
+            availableTools = emptyList(),
             provider = settings.selectedProvider,
             apiKey = apiKey
         )
-        
+
         when (finalResult) {
             is AIServiceResult.Success -> {
                 val finalMessage = Message(
@@ -211,11 +216,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     isFromUser = false
                 )
                 chatRepository.addMessage(finalMessage)
-                
-                conversationHistory.add(ConversationMessage(
-                    role = "assistant",
-                    content = finalResult.response
-                ))
+
+                conversationHistory.add(
+                    ConversationMessage(
+                        role = "assistant",
+                        content = finalResult.response
+                    )
+                )
             }
             is AIServiceResult.Error -> {
                 val errorMessage = Message(
@@ -226,17 +233,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 chatRepository.addMessage(errorMessage)
             }
         }
-        
+
         _uiState.value = _uiState.value.copy(isLoading = false)
     }
-    
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(error = null)
     }
-    
+
     fun clearChat() {
         conversationHistory.clear()
-        // Note: ChatRepository would need a clear method
         _uiState.value = _uiState.value.copy(messages = emptyList())
     }
 }
@@ -246,5 +252,6 @@ data class ChatUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val currentProvider: AIProvider = AIProvider.OPENAI,
-    val hasApiKey: Boolean = false
+    val hasApiKey: Boolean = false,
+    val termuxStatus: TermuxStatus? = null
 )

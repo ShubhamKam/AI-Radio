@@ -1,7 +1,6 @@
 package com.example.aiaagent.tools
 
 import android.content.Context
-import net.objecthunter.exp4j.ExpressionBuilder
 
 class CalculatorTool : Tool {
     override val name = "calculator"

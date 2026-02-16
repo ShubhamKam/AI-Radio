@@ -4,9 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+
+enum class AIProvider {
+    OPENAI,
+    GOOGLE_AI,
+    LOCAL_MODEL
+}
 
 class SettingsRepository(context: Context) {
 
@@ -23,7 +27,7 @@ class SettingsRepository(context: Context) {
     )
 
     private val _settings = MutableStateFlow(AppSettings())
-    val settings: Flow<AppSettings> = _settings.asStateFlow()
+    val settings: MutableStateFlow<AppSettings> = _settings
 
     init {
         loadSettings()

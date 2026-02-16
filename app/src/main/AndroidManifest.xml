@@ -2,12 +2,36 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Network permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- App query permission -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <!-- Storage permissions -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <!-- Battery stats -->
     <uses-permission android:name="android.permission.BATTERY_STATS" tools:ignore="ProtectedPermissions" />
+
+    <!-- Termux RUN_COMMAND permission -->
+    <uses-permission android:name="com.termux.permission.RUN_COMMAND" />
+
+    <!-- Foreground service permission for Termux command execution -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Queries for Termux packages -->
+    <queries>
+        <package android:name="com.termux" />
+        <package android:name="com.termux.api" />
+        <package android:name="com.termux.boot" />
+        <package android:name="com.termux.float" />
+        <package android:name="com.termux.styling" />
+        <package android:name="com.termux.tasker" />
+        <package android:name="com.termux.widget" />
+    </queries>
 
     <application
         android:name=".AIAgentApplication"
@@ -22,7 +46,8 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.AIAAgent">
+            android:theme="@style/Theme.AIAAgent"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
